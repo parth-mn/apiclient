@@ -1,0 +1,79 @@
+// src/main/java/com/example/apiclient/ai/IntentDetector2.java
+package com.example.apiclient.ai;
+
+/* import com.google.ai.generativelanguage.v1beta2.GenerateContentResponse;
+import com.google.ai.generativelanguage.v1beta2.ModelServiceClient;
+import com.google.ai.generativelanguage.v1beta2.ModelName; */
+
+import com.google.genai.types.GenerateContentResponse;
+
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class IntentDetector2 {
+    private static final String MODEL = "gemini-1.5-flash";
+    private static final GenerativeModel model =
+            new GenerativeModel(MODEL, System.getenv("GEMINI_API_KEY"));
+
+    // one prompt that returns a single JSON object (no prose)
+    private static final String PROMPT = """
+  You classify a WhatsApp B2B commerce command and extract entities.
+  Reply as ONE compact JSON object ONLY, no prose or markdown.
+
+  Allowed intents:
+    VIEW_PRODUCTS, VIEW_CATEGORIES, SHOW_PRODUCT,
+    ADD_TO_CART, ADJUST_QTY, SHOW_CART, PLACE_ORDER,
+    SHOW_PENDING, SHOW_HEADER, HELP, UNKNOWN
+
+  Fields (all optional except intent):
+    intent: enum above
+    category: string (e.g., "interior", "wood-finishes")
+    code: product or sku code (digits)
+    page: integer (>=1; user-facing)
+    size: integer
+    qty: integer
+    entry: integer (cart entry number; >=0)
+
+  Examples:
+    "show interior paints" -> {"intent":"VIEW_PRODUCTS","category":"interior"}
+    "products emulsion 2" -> {"intent":"VIEW_PRODUCTS","category":"emulsion","page":2}
+    "product 51707" -> {"intent":"SHOW_PRODUCT","code":"51707"}
+    "add 312101015025 5" -> {"intent":"ADD_TO_CART","code":"312101015025","qty":5}
+    "setqty 0 3" -> {"intent":"ADJUST_QTY","entry":0,"qty":3}
+    "cart" -> {"intent":"SHOW_CART"}
+
+  User: %s
+  """;
+
+    public static NluResult detect(String user) {
+        try {
+            GenerateContentResponse r = model.generateContent(PROMPT.formatted(user));
+            String json = r.getText();
+            // minimal parse with regex (keeps deps light; we only need a few fields)
+            Intent intent = Intent.UNKNOWN;
+            String category = pick(json, "\"category\"\\s*:\\s*\"([^\"]+)\"");
+            String code     = pick(json, "\"code\"\\s*:\\s*\"?(\\d+)\"?");
+            Integer page    = parseInt(pick(json, "\"page\"\\s*:\\s*(\\d+)"));
+            Integer size    = parseInt(pick(json, "\"size\"\\s*:\\s*(\\d+)"));
+            Integer qty     = parseInt(pick(json, "\"qty\"\\s*:\\s*(\\d+)"));
+            Integer entry   = parseInt(pick(json, "\"entry\"\\s*:\\s*(\\d+)"));
+
+            String in = pick(json, "\"intent\"\\s*:\\s*\"([A-Z_]+)\"");
+            if (in != null) try { intent = Intent.valueOf(in); } catch (Exception ignored) {}
+
+            return new NluResult(intent, category, code, page, size, qty, entry);
+        } catch (Exception e) {
+            return new NluResult(Intent.UNKNOWN, null, null, null, null, null, null);
+        }
+    }
+
+    private static String pick(String s, String rx) {
+        if (s == null) return null;
+        Matcher m = Pattern.compile(rx).matcher(s);
+        return m.find() ? m.group(1) : null;
+    }
+    private static Integer parseInt(String s) {
+        try { return s == null ? null : Integer.parseInt(s); } catch (Exception e) { return null; }
+    }
+}

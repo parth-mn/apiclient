@@ -1,0 +1,36 @@
+app:
+  baseUrl: "https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com"
+  base-url: "https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com"
+  clientId: "mobile_android"
+  clientSecret: "a3384edaa4452aae4e590db121d3010a"
+  username: "1111111111"
+  password: "1234"
+  distChannel: "11"
+  dist-channel: "11"
+  unit-code: "6100000042"
+  unitCode: "6100000042"
+
+api:
+  base-url: https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com
+  dist-channel: "11"
+  unit-code: "6100000042"
+
+
+# spring:
+# main:
+#  web-application-type: none
+
+twilio:
+  accountSid: "ACa819ccfa5901dae996e2f1ae1761d921"
+  authToken:  "f392e37cae31f5e6b85d7043472e9cb0"
+  fromWhatsApp: "whatsapp:+14155238886"
+
+spring:
+  main:
+    banner-mode: off
+logging:
+  level:
+    root: WARN
+
+gemini:
+  api-key: ${GOOGLE_API_KEY:} #AIzaSyBNgXf5p4tRtjOvC71Q2xcs98tIqmGspG4}

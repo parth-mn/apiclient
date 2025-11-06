@@ -1,0 +1,42 @@
+package com.example.apiclient.ai;
+
+public class NaturalLanguageRouter {
+
+    // returns the exact command string your CommandRouter already understands
+    private final IntentDetector detector;
+    public NaturalLanguageRouter(IntentDetector detector) {  // ✅ inject it
+        this.detector = detector;
+    }
+
+    public String toCommand(String user) {
+        NluResult n = detector.detect(user);
+
+        return switch (n.intent()) {
+            case VIEW_CATEGORIES -> "categories";
+            case VIEW_PRODUCTS -> {
+                String cat = n.category() != null ? n.category() : "interior";
+                int page = n.page() != null ? n.page() : 1;
+                int size = n.size() != null ? n.size() : 12;
+                yield "products " + cat + " " + page + " " + size;
+            }
+            case SHOW_PRODUCT -> {
+                if (n.code() == null) yield "help";
+                yield "product " + n.code();
+            }
+            case ADD_TO_CART -> {
+                if (n.code() == null) yield "help";
+                int qty = n.qty() != null ? n.qty() : 1;
+                yield "add " + n.code() + " " + qty;
+            }
+            case ADJUST_QTY -> {
+                if (n.entry() == null || n.qty() == null) yield "help";
+                yield "setqty " + n.entry() + " " + n.qty();
+            }
+            case SHOW_CART -> "cart";
+            case PLACE_ORDER -> "order";
+            case SHOW_PENDING -> "pending";
+            case SHOW_HEADER -> "header";
+            case HELP, UNKNOWN -> "help";
+        };
+    }
+}

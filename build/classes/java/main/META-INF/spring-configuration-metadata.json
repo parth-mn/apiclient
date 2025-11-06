@@ -1,0 +1,30 @@
+{
+  "groups": [
+    {
+      "name": "api",
+      "type": "com.example.apiclient.ApiProperties",
+      "sourceType": "com.example.apiclient.ApiProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "api.base-url",
+      "type": "java.lang.String",
+      "sourceType": "com.example.apiclient.ApiProperties"
+    },
+    {
+      "name": "api.dist-channel",
+      "type": "java.lang.String",
+      "sourceType": "com.example.apiclient.ApiProperties"
+    },
+    {
+      "name": "api.unit-code",
+      "type": "java.lang.String",
+      "sourceType": "com.example.apiclient.ApiProperties"
+    }
+  ],
+  "hints": [],
+  "ignored": {
+    "properties": []
+  }
+}

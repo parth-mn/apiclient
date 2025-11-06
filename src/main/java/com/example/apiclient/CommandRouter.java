@@ -1,0 +1,296 @@
+package com.example.apiclient;
+
+import com.example.apiclient.dto.*;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+import com.example.apiclient.formatter.WhatsappFormatter;
+
+@Service
+public class CommandRouter {
+    private final TokenService tokens;
+    private final CommerceApi api;
+
+    public CommandRouter(TokenService tokens, CommerceApi api) {
+        this.tokens = tokens; this.api = api;
+    }
+
+    private static int parseIntSafe(String s, int def) {
+        try { return Integer.parseInt(s.trim()); } catch (Exception e) { return def; }
+    }
+    private static int parseQty(String s) {
+        if (s == null) return 1;
+        // remove everything that is not 0-9 (handles fullwidth digits, stray spaces, emoji, etc.)
+        String digits = s.replaceAll("\\D+", "");
+        if (digits.isBlank()) return 1;
+        try {
+            int q = Integer.parseInt(digits);
+            return q > 0 ? q : 1;
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
+
+
+    public Mono<String> handle(String line) {
+        if (line == null || line.isBlank()) return Mono.just("Send 'help' to see commands.");
+        String[] parts = line.trim().split("\\s+");
+        String cmd = parts[0].toLowerCase();
+
+        return tokens.getAccessToken().flatMap(t -> switch (cmd) {
+            case "help" -> Mono.just("""
+          Commands:
+          categories
+          products <categoryCode> [page] [size]
+          search <text> [page] [size] [sort]
+          product <productCode>
+          add <skuCode> <qty>
+          setqty <entryNumber> <qty>
+          cart
+          order
+          header
+          pending [page] [size]
+          """);
+
+            case "categories" -> api.getCategories(t).map(res -> {
+                StringBuilder sb = new StringBuilder("Categories:\n");
+                if (res.customerCategories()!=null)
+                    res.customerCategories().forEach(c -> sb.append("- ").append(c.code()).append(" | ").append(c.name()).append("\n"));
+                return sb.toString();
+            });
+
+            case "products" -> {
+                if (parts.length < 2) yield Mono.just("Usage: products <categoryCode> [page] [size] [sort]");
+                String cat  = parts[1];
+
+                // user-facing (1-based) page & defaults
+                int userPage = parts.length >= 3 ? parseIntSafe(parts[2], 1) : 1;   // default 1
+                int size     = parts.length >= 4 ? parseIntSafe(parts[3], 12) : 12; // default 12
+                String sort  = parts.length >= 5 ? parts[4] : "name-asc";
+
+                // API expects 0-based page index
+                int apiPage  = Math.max(0, userPage - 1);
+
+                yield api.searchProductsByCategory(t, cat, apiPage, size, sort).map(r -> {
+                    int totalResults = (r.pagination() != null && r.pagination().totalResults() != null)
+                            ? r.pagination().totalResults() : 0;
+
+                    // try using totalPages from API; otherwise derive from totalResults & size
+                    int totalPages = (r.pagination() != null && r.pagination().totalPages() != null)
+                            ? r.pagination().totalPages()
+                            : Math.max(1, (int) Math.ceil(totalResults / (double) Math.max(1, size)));
+
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Results: ").append(totalResults)
+                            .append(" (page ").append(userPage).append("/").append(totalPages).append(")\n");
+
+                    if (r.products() != null && !r.products().isEmpty()) {
+                        r.products().forEach(p -> {
+                            String code = p.code() != null ? p.code() : "-";
+                            String name = p.name() != null && !p.name().isBlank() ? p.name() : "";
+                            sb.append("- ").append(code).append(" | ").append(name).append("\n");
+                        });
+                    } else {
+                        sb.append("(No products on this page)\n");
+                    }
+
+                    // show next-page hint if another page exists (user-facing 1-based)
+                    if (userPage < totalPages) {
+                        sb.append("Next: products ").append(cat).append(" ")
+                                .append(userPage + 1).append(" ").append(12).append(" ").append(sort);
+                    }
+
+                    return sb.toString().trim();
+                });
+            }
+            case "search" -> {
+                if (parts.length < 2) yield Mono.just("Usage: search <text> [page] [size] [sort]");
+                // allow simple multiword queries by joining until we hit numbers (optional: keep it simple for now)
+                String term = parts[1];
+                int userPage = (parts.length >= 3) ? Integer.parseInt(parts[2]) : 1;   // user page starts at 1
+                int size     = (parts.length >= 4) ? Integer.parseInt(parts[3]) : 12;
+                String sort  = (parts.length >= 5) ? parts[4] : "name-asc";
+
+                int apiPage = Math.max(0, userPage - 1); // convert to 0-based for OCC
+
+                yield api.searchProductsByText(t, term, apiPage, size, sort).map(r -> {
+                    int total = (r.pagination() != null) ? r.pagination().totalResults() : 0;
+                    int curr  = (r.pagination() != null) ? r.pagination().currentPage() : apiPage;
+                    int pages = (r.pagination() != null) ? r.pagination().totalPages() : 1;
+
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("🛍️ Products (").append(total).append(") — page ")
+                            .append(curr + 1).append("/").append(pages).append("\n"); // show 1-based
+
+                    if (r.products() != null && !r.products().isEmpty()) {
+                        r.products().forEach(p -> sb.append("- ")
+                                .append(p.code()).append(" | ")
+                                .append(p.name() != null ? p.name() : "")
+                                .append(p.price() != null && p.price().formattedValue() != null
+                                        ? " | " + p.price().formattedValue() : "")
+                                .append("\n"));
+                    } else {
+                        sb.append("(no results)\n");
+                    }
+
+                    // next page hint (keep same style you used for category listing)
+                    if (curr + 1 < pages) {
+                        sb.append("Next: search ").append(term).append(" ")
+                                .append(curr + 2).append(" ").append(size).append(" ").append(sort);
+                    }
+                    return sb.toString();
+                }).onErrorResume(e -> Mono.just("API error: " + e.getMessage()));
+            }
+
+
+
+            /*case "product" -> {
+                if (parts.length < 2) yield Mono.just("Usage: product <productCode>");
+                yield api.getProductDetails(t, parts[1]).map(p -> {
+                    StringBuilder sb = new StringBuilder(p.code() + " | " + p.name() + "\n");
+                    if (p.variantOptions()!=null) {
+                        sb.append("SKUs:\n");
+                        p.variantOptions().forEach(v -> sb.append("- ").append(v.code()).append(" | ").append(v.name())
+                                .append(" | ").append(v.packSize()==null?"":v.packSize())
+                                .append(" | ").append(v.priceData()!=null? v.priceData().formattedValue() : "")
+                                .append("\n"));
+                    }
+                    return sb.toString();
+                });
+            }*/
+
+            /*//images addition v1
+            case "product" -> {
+                if (parts.length < 2) yield Mono.just("Usage: product <productCode>");
+                yield api.getProductDetails(t, parts[1]).map(p -> {
+                    StringBuilder sb = new StringBuilder(p.code() + " | " + p.name() + "\n");
+
+                    // 🖼️ Add main product image link if available
+                    if (p.images() != null && !p.images().isEmpty()) {
+                        String rawUrl = p.images().get(0).url();
+                        String fullUrl = "https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com";
+                        if (rawUrl != null && !rawUrl.isBlank()) {
+                            // ensure the path formatting is correct
+                            if (!rawUrl.startsWith("/")) fullUrl += "/";
+                            fullUrl += rawUrl.startsWith("medias/") ? rawUrl : rawUrl;
+                            sb.append("\nImage: ").append(fullUrl);
+                        }
+                    }
+
+                    // 🧩 Add variant SKUs
+                    if (p.variantOptions() != null && !p.variantOptions().isEmpty()) {
+                        sb.append("\nSKUs:\n");
+                        p.variantOptions().forEach(v -> sb.append("- ")
+                                .append(v.code()).append(" | ")
+                                .append(v.name()).append(" | ")
+                                .append(v.packSize() == null ? "" : v.packSize()).append(" | ")
+                                .append(v.priceData() != null ? v.priceData().formattedValue() : "")
+                                .append("\n"));
+                    }
+
+                    return sb.toString();
+                });
+            }*/
+            //v2
+            case "product" -> {
+                if (parts.length < 2) yield Mono.just("Usage: product <productCode>");
+                String code = parts[1].trim();
+
+                yield api.getProductDetails(t, code).map(p -> {
+                    StringBuilder sb = new StringBuilder();
+
+                    // 🧾 Basic product info
+                    sb.append(p.code()).append(" | ").append(p.name()).append("\n");
+
+                    // 🖼️ Image link (only if available)
+                    if (p.images() != null && !p.images().isEmpty()) {
+                        String rawUrl = p.images().get(0).url();  // first image
+                        if (rawUrl != null && !rawUrl.isBlank()) {
+                            // build full link (no extra /medias/)
+                            String base = "https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com";
+                            String fullUrl = rawUrl.startsWith("/") ? base + rawUrl : base + "/" + rawUrl;
+                            sb.append("\nImage: ").append(fullUrl).append("\n");
+                        }
+                    }
+
+                    // 🧩 Variant SKUs
+                    if (p.variantOptions() != null && !p.variantOptions().isEmpty()) {
+                        sb.append("SKUs:\n");
+                        p.variantOptions().forEach(v -> sb.append("- ")
+                                .append(v.code()).append(" | ")
+                                .append(v.name()).append(" | ")
+                                .append(v.packSize() == null ? "" : v.packSize()).append(" | ")
+                                .append(v.priceData() != null ? v.priceData().formattedValue() : "")
+                                .append("\n"));
+                    }
+
+                    return sb.toString();
+                });
+            } 
+
+
+
+            case "add" -> {
+                if (parts.length < 3) yield Mono.just("Usage: add <skuCode> <qty>");
+                String sku = parts[1].trim();
+                int qty = parseQty(parts[2]);
+                System.out.println("[ADD] sku=" + sku + " qty=" + qty);
+
+                // call the sync method in a supplier to keep the Mono API
+                yield Mono.fromSupplier(() -> api.addSkuToCartSync(t, sku, qty))
+                        .map(result -> result.equals("OK")
+                                ? "✅ Added to cart\nSKU: " + sku + "\nQty: " + qty
+                                : result);
+            }
+
+
+            /* case "add" -> {
+                if (parts.length < 3) yield Mono.just("Usage: add <skuCode> <qty>");
+                String sku = parts[1].trim();
+                int qty = parseQty(parts[2]);
+                System.out.println("[ADD] sku=" + sku + " qty=" + qty);
+            //    System.out.println("[ADD] parsed qty=" + qty);
+
+                yield api.addSkuToCart(t, sku, qty)
+                        .map(resp -> "✅ Added to cart\nSKU: " + sku + "\nQty: " + qty)
+                        .onErrorResume(e -> Mono.just("API error: " + e.getMessage()));
+            } */
+
+
+
+            case "setqty" -> {
+                if (parts.length < 3) yield Mono.just("Usage: setqty <entryNumber> <qty>");
+                int entry = Integer.parseInt(parts[1]); int qty = Integer.parseInt(parts[2]);
+                yield api.updateCartEntryQuantity(t, entry, qty).map(r -> "Entry #" + entry + " set to " + qty + " (" + r.statusCode() + ")");
+            }
+
+            case "cart" -> api.getCurrentCart(t).map(c -> {
+                StringBuilder sb = new StringBuilder("Cart " + c.code() + " | Total Items: " + c.totalItems() + "\n");
+                if (c.entries()!=null) c.entries().forEach(e -> sb.append("- #").append(e.entryNumber() + 1).append(" x").append(e.quantity())
+                        .append(" | ").append(e.product()!=null?e.product().name():"").append("\n"));
+                return sb.toString();
+            });
+
+            case "order" -> api.placeOrderFromCart(t).map(o -> "Order placed: " + o.code() + " | " + o.statusDisplay());
+
+            case "header" -> api.fetchHeaderInfo(t).map(h -> "Outstanding " + h.totalOutstanding()
+                    + " | Due today " + h.dueToday() + " | Avl credit " + h.availableCreditLimit());
+
+            case "pending" -> {
+                int page = parts.length >= 2 ? Integer.parseInt(parts[1]) : 0;
+                int size = parts.length >= 3 ? Integer.parseInt(parts[2]) : 10;
+                yield api.fetchPendingOrders(t, page, size).map(po -> {
+                    StringBuilder sb = new StringBuilder("Pending/Approved orders:\n");
+                    if (po.orders()!=null) po.orders().forEach(o -> sb.append("- ").append(o.displayCode())
+                            .append(" | ").append(o.statusDisplay())
+                            .append(" | items ").append(o.pendingItemCount())
+                            .append(" | qty ").append(o.pendingTotalQuantity()).append("\n"));
+                    return sb.toString();
+                });
+            }
+
+            default -> Mono.just("Unknown command. Send 'help'.");
+
+        });
+    }
+}

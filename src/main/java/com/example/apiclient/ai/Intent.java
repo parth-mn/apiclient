@@ -1,0 +1,5 @@
+package com.example.apiclient.ai;
+public enum Intent {
+    VIEW_PRODUCTS, VIEW_CATEGORIES, SHOW_PRODUCT, ADD_TO_CART,
+    ADJUST_QTY, SHOW_CART, PLACE_ORDER, SHOW_PENDING, SHOW_HEADER, HELP, UNKNOWN
+}
