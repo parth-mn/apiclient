@@ -1,6 +1,6 @@
 app:
-  baseUrl: "https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com"
-  base-url: "https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com"
+  baseUrl: "https://api.cc01erru2b-grasimind1-s1-public.model-t.cc.commerce.ondemand.com"
+  base-url: "https://api.cc01erru2b-grasimind1-s1-public.model-t.cc.commerce.ondemand.com"
   clientId: "mobile_android"
   clientSecret: "a3384edaa4452aae4e590db121d3010a"
   username: "1111111111"
@@ -11,7 +11,7 @@ app:
   unitCode: "6100000042"
 
 api:
-  base-url: https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com
+  base-url: https://api.cc01erru2b-grasimind1-s1-public.model-t.cc.commerce.ondemand.com
   dist-channel: "11"
   unit-code: "6100000042"
 

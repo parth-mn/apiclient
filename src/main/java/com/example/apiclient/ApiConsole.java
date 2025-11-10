@@ -182,6 +182,32 @@ public class ApiConsole {
                         }));
             }
 
+            case "info" -> {
+                if (parts.length < 2) { System.out.println("Usage: sku <searchCode>"); break; }
+                String searchCode = String.join(" ", java.util.Arrays.copyOfRange(parts, 1, parts.length)).trim();
+                withToken(t -> api.searchProductBySkuOrShortName(t, searchCode)
+                        .doOnNext(resp -> {
+                            var list = (resp != null) ? resp.variantSearches() : null;
+                            if (list == null || list.isEmpty()) {
+                                System.out.println("No matches found.");
+                                return;
+                            }
+                            System.out.println("Matches: " + list.size());
+                            list.forEach(v -> {
+                                System.out.println("- " + safe(v.skuCode()) + " | " + safe(v.baseProductName())
+                                        + " | " + safe(v.productShortName()) + " | " + safe(v.packSize())
+                                        + " | " + safe(v.shadeName()));
+                                if (v.productImage() != null && v.productImage().url() != null) {
+                                    String full = CommerceApi.toFullMediaUrl(v.productImage().url());
+                                    if (full != null) System.out.println("  Image: " + full);
+                                }
+                            });
+                        })
+                        .onErrorResume(e -> { System.out.println("Error: " + e.getMessage()); return Mono.empty(); })
+                );
+            }
+
+
             case "search" -> {
                 if (parts.length < 2) {
                     System.out.println("Usage: search <text> [page] [size] [sort]");
@@ -279,6 +305,9 @@ public class ApiConsole {
 
     private int safeInt(String s, int def) {
         try { return Integer.parseInt(s); } catch (Exception e) { return def; }
+    }
+    private String safe(String s) {
+        return (s == null || s.isBlank()) ? "" : s.trim();
     }
 
 }

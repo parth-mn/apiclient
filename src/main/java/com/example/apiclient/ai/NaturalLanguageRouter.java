@@ -39,7 +39,7 @@ public class NaturalLanguageRouter {
         // If it already looks like a command, pass through
         String lower = userText == null ? "" : userText.trim().toLowerCase();
         //if (lower.matches("^(help|categories|products|product|add|setqty|cart|order|pending|header)\\b.*")) {return userText.trim();}
-        if (lower.matches("^(help|categories|products|product|add|setqty|cart|order|pending|header)\\b.*"))
+        if (lower.matches("^(help|categories|products|product|add|setqty|cart|order|pending|header|search|info)\\b.*"))
             return userText.trim();
 
 

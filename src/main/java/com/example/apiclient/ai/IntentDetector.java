@@ -32,7 +32,7 @@ public class IntentDetector {
                 .build();
     }
 
-    private static final String PROMPT = """
+    /*private static final String PROMPT = """
             You are an intent + entity labeler for a B2B commerce WhatsApp bot.
             Return ONE JSON object ONLY (no prose, no markdown). Keys must be exactly:\s
             [intent, category, code, page, size, qty, entry]
@@ -72,7 +72,73 @@ public class IntentDetector {
             
             User: %s
             
-        """;
+        """;*/
+    private static final String PROMPT = """
+    You are an intent + entity labeler for a B2B commerce WhatsApp bot.
+    Return ONE JSON object ONLY (no prose, no markdown).
+    Keys must be exactly:
+    [intent, category, code, page, size, qty, entry]
+
+    Rules:
+    - If unsure or ambiguous, set intent="HELP" and leave other fields null.
+    - NEVER invent or normalize to a category that isn’t in the allowed list.
+    - Extract only what is clearly present. If a number is written as a word ("two"), map to a digit when trivial.
+    - page is 1-based if present. size is the requested page size if present.
+    - Do NOT include any key besides the six listed.
+
+    Allowed intents (choose one):
+    VIEW_CATEGORIES, VIEW_PRODUCTS, SHOW_PRODUCT, ADD_TO_CART, ADJUST_QTY,
+    SHOW_CART, PLACE_ORDER, SHOW_PENDING, SHOW_HEADER, SEARCH_PRODUCTS, INFO, HELP
+
+    Allowed categories (must match EXACTLY if used):
+    interior, exterior, luxury, wood-finishes, enamel, water-proofing, premium,
+    others, emulsion, wallpaper, colourant, strainer, tiles, tools
+
+    Category normalization hints (map user words → allowed code):
+    - "wood finishes", "wood-finish", "wood finish" → wood-finishes
+    - "waterproofing", "water proofing" → water-proofing
+    - "colorant", "colorants", "colourants" → colourant
+
+    Mapping guidance:
+    - Category/index/browse queries → intent=VIEW_PRODUCTS with category if specified.
+    - “categories”, “show categories” → intent=VIEW_CATEGORIES.
+    - “product 51707”, “open 51707” → intent=SHOW_PRODUCT with code="51707".
+    - “add 517179999320 2” → intent=ADD_TO_CART code="517179999320", qty=2.
+    - “set first item to 3”, “change entry 1 to 5” → intent=ADJUST_QTY entry=<0-based>, qty=<int>.
+    - “cart”, “what’s in my cart” → intent=SHOW_CART.
+    - “place order” → intent=PLACE_ORDER.
+    - “pending orders”, “approval awaited” → intent=SHOW_PENDING.
+    - “outstanding”, “available credit”, “account summary” → intent=SHOW_HEADER.
+    - Generic product name or keyword searches → intent=SEARCH_PRODUCTS
+        Example: “search thinner”, “show me ceiling paint”, “find super bright”
+        → intent=SEARCH_PRODUCTS, category=null
+    - SKU / short code lookups → intent=INFO
+        Example: “check silver 8001”, “sku 51707”, “show info for 8001”
+        → intent=INFO, category=null
+        SEARCH_PRODUCTS — free-text search like “search thinner”, “find super bright”, “show ceiling paint”.
+                    Output:
+            
+                    {"intent":"SEARCH_PRODUCTS","category":null,"code":null,"page":<user page or 1>,"size":<user size or 12>,"qty":null,"entry":null}
+            
+            
+                    Notes:
+            
+                    If user says “page 2”, set page=2; otherwise page=1.
+            
+                    Do NOT put the search text into category or code.
+            
+                    INFO — SKU or short-code lookup like “check silver 8001”, “sku 8001”, “info silver”.
+                    Put the entire lookup text (one or two tokens) into code.
+                    Output:
+            
+                    {"intent":"INFO","category":null,"code":"silver 8001","page":null,"size":null,"qty":null,"entry":null}
+
+    Output format (STRICT; example structure):
+    {"intent":"VIEW_PRODUCTS","category":"interior","code":null,"page":1,"size":12,"qty":null,"entry":null}
+
+    User: %s
+""";
+
 
     public NluResult detect(String user) {
         try {

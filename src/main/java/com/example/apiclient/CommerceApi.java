@@ -28,7 +28,7 @@ public class CommerceApi {
     private final ApiClient client;
     private final ApiProperties props;
     private HttpClient http() { return HttpClient.newHttpClient(); }
-    private static final String MEDIA_BASE = "https://api.cc01erru2b-grasimind1-d1-public.model-t.cc.commerce.ondemand.com/medias/";
+    private static final String MEDIA_BASE = "https://api.cc01erru2b-grasimind1-s1-public.model-t.cc.commerce.ondemand.com/medias/";
 
     public static String toFullMediaUrl(String url) {
         if (url == null || url.isBlank()) return null;
@@ -194,6 +194,17 @@ public class CommerceApi {
         return client.postForm(path, token, form, AddToCartResponse.class);
 
     }*/
+    public Mono<VariantSkuSearchResponse> searchProductBySkuOrShortName(String token, String searchCode) {
+        String uri = UriComponentsBuilder
+                .fromPath("/occ/v2/cpp/users/current/search/searchProductSkuShortName")
+                .queryParam("fields", "DEFAULT")
+                .queryParam("searchCode", searchCode)
+                .encode(StandardCharsets.UTF_8)
+                .toUriString();
+
+        System.out.println("[API] GET " + uri);
+        return client.get(uri, token, VariantSkuSearchResponse.class);
+    }
 
 
     public Mono<UpdateEntryResponse> updateCartEntryQuantity(String token, int entryNumber, int quantity) {
