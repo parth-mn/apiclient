@@ -41,8 +41,36 @@ public class CommandRouter {
 
         return tokens.getAccessToken().flatMap(t -> switch (cmd) {
 
+            case "hi","hey","hello" -> Mono.just("""
+        👋 Hi! How can I help you today?
+        1. Searching and ordering
+        2. View pending orders
+        3. Outstanding information
+        \u200B
+        Type *help* to see a full list of commands.
+        """.trim());
+
+            case "1" -> Mono.just("""
+                    🔎 *Searching and Ordering Products*
+
+        You can use these simple messages to explore and order products:
+                    \u200B
+        • Type *categories* to see all available product groups  
+        • Type *products interior* or *products exterior* to browse within a category  
+        • Type *search <product name>* — for example:  
+          👉 `search super bright` or `search red primer`  
+        • Type *product <code>* to view details — e.g. `product 51707`  
+        • Type *add <sku> <qty>* to add to your cart — e.g. `add 51707 2`  
+        • Type *cart* anytime to view what you’ve added  
+        • When you’re ready, type *order* to place it!
+                    \u200B
+        💡 *Tip:* You can also type only part of a name —  
+        like `search bright` — to find matching items quickly.
+        """.trim());
+
             case "help" -> Mono.just("""
                     🤖 *Bot Commands*
+                    \n\u200B\n
                     • *categories*
                     • *products* <categoryCode> [page] [size]
                     • *search* <text> [page] [size] [sort]
@@ -57,7 +85,7 @@ public class CommandRouter {
                     """);
 
             case "categories" -> api.getCategories(t).map(res -> {
-                StringBuilder sb = new StringBuilder("📂 *Available Categories:*\n");
+                StringBuilder sb = new StringBuilder("📂 *Available Categories:*\n\u200B\n");
                 if (res.customerCategories() != null) {
                     res.customerCategories().forEach(c ->
                             sb.append("- ").append(c.name()).append("\n")
@@ -91,7 +119,7 @@ public class CommandRouter {
                     StringBuilder sb = new StringBuilder();
                     sb.append("🛍️ *Products in* `").append(cat).append("`\n")
                       .append("Total: ").append(totalResults)
-                      .append(" — Page ").append(userPage).append("/").append(totalPages).append("\n\n");
+                      .append(" — Page ").append(userPage).append("/").append(totalPages).append("\n\u200B\n");
 
                     if (r.products() != null && !r.products().isEmpty()) {
                         r.products().forEach(p -> {
@@ -106,7 +134,7 @@ public class CommandRouter {
                     }
 
                     if (userPage < totalPages) {
-                        sb.append("\n_Next:_ `products ")
+                        sb.append("\n\u200B\n_Next:_ `products ")
                           .append(cat).append(" ")
                           .append(userPage + 1).append(" ")
                           .append(size).append(" ").append(sort)
@@ -138,7 +166,7 @@ public class CommandRouter {
                     StringBuilder sb = new StringBuilder();
                     sb.append("🔎 *Search:* `").append(term).append("`\n")
                       .append("Results: ").append(total)
-                      .append(" — Page ").append(curr + 1).append("/").append(pages).append("\n\n");
+                      .append(" — Page ").append(curr + 1).append("/").append(pages).append("\n\u200B\n");
 
                     if (r.products() != null && !r.products().isEmpty()) {
                         r.products().forEach(p -> {
@@ -155,7 +183,7 @@ public class CommandRouter {
                     }
 
                     if (curr + 1 < pages) {
-                        sb.append("\n_Next:_ `search ")
+                        sb.append("\n\u200B\n_Next:_ `search ")
                           .append(term).append(" ")
                           .append(curr + 2).append(" ")
                           .append(size).append(" ").append(sort)
@@ -176,7 +204,7 @@ public class CommandRouter {
                             if (list == null || list.isEmpty()) return "No matches found.";
 
                             StringBuilder sb = new StringBuilder();
-                            sb.append("🔎 SKU Search: ").append(searchCode).append("\n");
+                            sb.append("🔎 SKU Search: ").append(searchCode).append("\n\u200B\n");
                             for (var v : list) {
                                 String sku = v.skuCode() != null ? v.skuCode() : "";
                                 String name = v.productShortName() != null
@@ -185,7 +213,7 @@ public class CommandRouter {
                                 String packSize = v.packSize() != null ? v.packSize() : "";
                                 String shade = v.shadeName() != null ? v.shadeName() : "";
 
-                                sb.append("\n- SKU: ").append(sku).append("\n");
+                                sb.append("\n\u200B\n- SKU: ").append(sku).append("\n");
                                 if (!name.isEmpty()) sb.append("Name: ").append(name).append("\n");
                                 if (!packSize.isEmpty()) sb.append("Pack Size: ").append(packSize).append("\n");
                                 if (!shade.isEmpty()) sb.append("Shade: ").append(shade).append("\n");
@@ -217,12 +245,9 @@ public class CommandRouter {
                         if (rawUrl != null && !rawUrl.isBlank()) {
                             String base = "https://api.cc01erru2b-grasimind1-s1-public.model-t.cc.commerce.ondemand.com";
                             String fullUrl = rawUrl.startsWith("/") ? base + rawUrl : base + "/" + rawUrl;
-                            sb.append("\nImage: ").append(fullUrl).append("\n");
+                            sb.append("\n\u200B\nImage: ").append(fullUrl).append("\n");
                         }
                     }
-
-                    // ❗ SKUs intentionally NOT shown as requested
-
                     return sb.toString().trim();
                 });
             }
@@ -235,25 +260,36 @@ public class CommandRouter {
 
                 yield Mono.fromSupplier(() -> api.addSkuToCartSync(t, sku, qty))
                         .map(result -> result.equals("OK")
-                                ? "✅ *Added to Cart*\nSKU: " + sku + "\nQuantity: " + qty
+                                ? "✅ *Added to Cart!*\n\u200B\nSKU: " + sku + "\nQuantity: " + qty
                                 : result);
             }
+            /*case "add" -> {
+                if (parts.length < 3) yield Mono.just("Usage: add <skuCode> <qty>");
+                String sku = parts[1].trim();
+                int qty = parseQty(parts[2]);
+                System.out.println("[ADD] sku=" + sku + " qty=" + qty);
+
+                yield api.addSkuToCart(t, sku, qty)
+                        .map(resp -> "✅ Added to cart\nSKU: " + sku + "\nQty: " + qty)
+                        .onErrorResume(e -> Mono.just("API error: " + e.getMessage()));
+            }*/
+
 
             case "setqty" -> {
                 if (parts.length < 3) yield Mono.just("Usage: *setqty* <entryNumber> <qty>");
                 int entry = parseIntSafe(parts[1], 0);
                 int qty   = parseIntSafe(parts[2], 1);
-                yield api.updateCartEntryQuantity(t, entry, qty)
-                        .map(r -> "✏️ *Updated Cart Entry*\nEntry: #" + entry + "\nQuantity: " + qty +
+                yield api.updateCartEntryQuantity(t, entry-1, qty)
+                        .map(r -> "✏️ *Updated Cart Entry!*\n\u200B\nEntry: #" + entry + "\nQuantity: " + qty +
                                 "\nStatus: " + r.statusCode());
             }
 
             case "cart" -> api.getCurrentCart(t).map(c -> {
                 int totalItems = c.totalItems() != null ? c.totalItems() : 0;
                 StringBuilder sb = new StringBuilder();
-                sb.append("🛒 *Your Cart*\n");
+                sb.append("🛒 *Your Cart*\n\u200B\n");
                 sb.append("Cart Code: ").append(c.code()).append("\n");
-                sb.append("Total Items: ").append(totalItems).append("\n\n");
+                sb.append("Total Items: ").append(totalItems).append("\n\u200B\n");
 
                 if (c.entries() != null && !c.entries().isEmpty()) {
                     c.entries().forEach(e -> sb.append("- #")
@@ -269,9 +305,9 @@ public class CommandRouter {
             });
 
             case "order" -> api.placeOrderFromCart(t)
-                    .map(o -> "✅ *Order Placed*\nOrder: " + o.code() + "\nStatus: " + o.statusDisplay());
+                    .map(o -> "✅ *Order Placed!*\n\u200B\nOrder: " + o.code() + "\nStatus: " + o.statusDisplay());
 
-            case "header" -> api.fetchHeaderInfo(t).map(h -> {
+            case "header","3" -> api.fetchHeaderInfo(t).map(h -> {
                 String outstanding    = IndianNumberFormatter.formatIndianNumberWithDecimals(h.totalOutstanding());
                 String netOutstanding = IndianNumberFormatter.formatIndianNumberWithDecimals(h.netOutstanding());
                 String overdue        = IndianNumberFormatter.formatIndianNumberWithDecimals(h.totalOverdue());
@@ -286,12 +322,12 @@ public class CommandRouter {
                         Outstanding: *₹%s*
                         Net Outstanding: *₹%s*
                         Overdue: *₹%s*
-
+                        \u200B
                         📅 *Dues*
                         • Due Today: *₹%s*
                         • Due Later: *₹%s*
                         • Days Due: *%s*
-
+                        \u200B
                         💳 *Credit*
                         • Available Credit: *₹%s*
                         • Unutilized Credit: *₹%s*
@@ -307,13 +343,13 @@ public class CommandRouter {
                 ).trim();
             });
 
-            case "pending" -> {
+            case "pending","2" -> {
                 int page = parts.length >= 2 ? parseIntSafe(parts[1], 0) : 0;
                 int size = parts.length >= 3 ? parseIntSafe(parts[2], 10) : 10;
                 yield api.fetchPendingOrders(t, page, size).map(po -> {
                     StringBuilder sb = new StringBuilder();
                     sb.append("📦 *Pending / Approved Orders*\n");
-                    sb.append("Page: ").append(page).append("  Size: ").append(size).append("\n\n");
+                    sb.append("Page: ").append(page+1).append("  Size: ").append(size).append("\n\u200B\n");
 
                     if (po.orders() != null && !po.orders().isEmpty()) {
                         po.orders().forEach(o -> sb.append("- *")
@@ -321,7 +357,7 @@ public class CommandRouter {
                                 .append("\n  Status: ").append(o.statusDisplay())
                                 .append("\n  Items: ").append(o.pendingItemCount())
                                 .append(" | Qty: ").append(o.pendingTotalQuantity())
-                                .append("\n\n"));
+                                .append("\n\u200B\n"));
                     } else {
                         sb.append("(no pending/approved orders)");
                     }

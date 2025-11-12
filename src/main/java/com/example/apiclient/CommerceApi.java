@@ -137,8 +137,8 @@ public class CommerceApi {
                     .uri(URI.create(url))
                     .timeout(Duration.ofSeconds(20))
                     .header("Authorization", "Bearer " + token)
-                    .header("X-Distribution-Channel", props.getDistChannel())
-                    .header("X-Unit-Code", props.getUnitCode())
+                    .header("Distribution-channel-code", props.getDistChannel())
+                    .header("unit-Code", props.getUnitCode())
                     .header("Content-Type", "application/x-www-form-urlencoded") // ✅ form data
                     .POST(HttpRequest.BodyPublishers.ofString(form))
                     .build();

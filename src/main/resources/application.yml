@@ -22,7 +22,9 @@ api:
 
 twilio:
   accountSid: "ACa819ccfa5901dae996e2f1ae1761d921"
-  authToken:  "f392e37cae31f5e6b85d7043472e9cb0"
+  authToken0:  "f392e37cae31f5e6b85d7043472e9cb0"
+  authToken: "c6873f3b1f664e155d23f802732621e1"
+  #testToken: "13cca6955278741ad240ec4f4306401a"
   fromWhatsApp: "whatsapp:+14155238886"
 
 spring:
